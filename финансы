@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FinDash — Прототип дашборда</title>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#071021; --card:#0b1220; --accent:#00c2a8; --muted:#94a3b8; --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family: Inter, Roboto, Helvetica, Arial, sans-serif; background:linear-gradient(180deg,#071021,#0a1220); color:#e6eef3}
+    .wrap{display:flex; min-height:100vh}
+    aside{width:220px; padding:20px; border-right:1px solid rgba(255,255,255,0.03)}
+    .brand{color:var(--accent); font-weight:700; font-size:20px; margin-bottom:12px}
+    nav ul{list-style:none;padding:0;margin:0}
+    nav a{display:block;color:var(--muted); text-decoration:none; padding:8px 4px; border-radius:6px}
+    nav a.active, nav a:hover{color:#fff; background:rgba(255,255,255,0.03)}
+    main{flex:1;padding:20px;overflow:auto}
+    .row{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap}
+    .card{background:var(--glass); padding:14px; border-radius:10px; border:1px solid rgba(255,255,255,0.03); box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+    .card.full{width:100%}
+    .col-8{flex:1 1 65%}
+    .col-4{flex:1 1 30%}
+    h1{margin:0 0 8px 0; font-size:20px}
+    .small{color:var(--muted); font-size:13px}
+    .big-num{font-size:28px; font-weight:700; margin-top:6px}
+    canvas{width:100%!important;height:260px!important}
+    table{width:100%; border-collapse:collapse; margin-top:8px}
+    td,th{padding:8px; border-bottom:1px solid rgba(255,255,255,0.03); text-align:left}
+    .btn{background:var(--accent); color:#012; padding:8px 12px; border-radius:8px; cursor:pointer; border:none}
+    footer{margin-top:18px;color:var(--muted); font-size:13px}
+    /* responsive */
+    @media(max-width:900px){
+      aside{display:none}
+      .col-8, .col-4{flex-basis:100%}
+      canvas{height:220px!important}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside>
+      <div class="brand">FinDash</div>
+      <nav>
+        <ul>
+          <li><a href="#dashboard" id="link-dashboard" class="active">Dashboard</a></li>
+          <li><a href="#crypto" id="link-crypto">Crypto</a></li>
+          <li><a href="#transactions" id="link-transactions">Transactions</a></li>
+          <li><a href="#settings" id="link-settings">Settings</a></li>
+        </ul>
+      </nav>
+      <div style="margin-top:18px" class="small">Base currency: <strong>USD</strong></div>
+      <div style="margin-top:12px">
+        <button class="btn" id="btn-refresh">Обновить данные</button>
+      </div>
+    </aside>
+
+    <main>
+      <!-- Dashboard -->
+      <section id="dashboard" class="view">
+        <h1>Обзор портфеля</h1>
+        <div class="small">Сводка состояния и ключевые метрики</div>
+
+        <div class="row" style="margin-top:12px">
+          <div class="card col-8">
+            <div class="small">Total portfolio value</div>
+            <div class="big-num" id="totalValue">$0</div>
+            <div class="small" id="totalChange">Change: —</div>
+            <canvas id="chart-portfolio"></canvas>
+          </div>
+
+          <div class="card col-4">
+            <div class="small">Allocation</div>
+            <canvas id="chart-allocation" style="height:220px"></canvas>
+            <div id="alloc-legend" style="margin-top:8px"></div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <div class="card col-8">
+            <div class="small">Performance vs Index</div>
+            <canvas id="chart-vsindex"></canvas>
+          </div>
+
+          <div class="card col-4">
+            <div class="small">Top positions</div>
+            <table id="top-table">
+              <thead><tr><th>Symbol</th><th>Value</th><th>P/L</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+<section id="crypto" class="view" style="display:none">
+        <h1>Крипто</h1>
+        <div class="small">Отдельная витрина для криптовалют</div>
+
+        <div class="row" style="margin-top:12px">
+          <div class="card col-8">
+            <div class="small">Total crypto value</div>
+            <div class="big-num" id="cryptoTotal">$0</div>
+            <canvas id="chart-crypto"></canvas>
+          </div>
+
+          <div class="card col-4">
+            <div class="small">By coin</div>
+            <canvas id="chart-coinpie" style="height:220px"></canvas>
+            <div id="coin-legend" style="margin-top:8px"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Transactions -->
+      <section id="transactions" class="view" style="display:none">
+        <h1>Транзакции</h1>
+        <div class="card full" style="margin-top:12px">
+          <table id="tx-table">
+            <thead><tr><th>Date</th><th>Type</th><th>Asset</th><th>Amount</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="settings" class="view" style="display:none">
+        <h1>Settings</h1>
+        <div class="card" style="margin-top:12px">
+          <p class="small">Preferences (mock)</p>
+          <p>Base currency: USD</p>
+          <p>Notification thresholds: 5%</p>
+        </div>
+      </section>
+
+      <footer>Прототип дашборда • можно подключить реальные источники (брокер, CoinGecko) — напиши, помогу интегрировать</footer>
+    </main>
+  </div>
+
+<script>
+/* ---------- MOCK DATA ---------- */
+const mock = (function(){
+  const now = new Date();
+  // portfolio history (31 points)
+  const history = Array.from({length:31}).map((_,i)=>{
+    const d = new Date(now); d.setDate(now.getDate()- (30-i));
+    const date = d.toISOString().slice(0,10);
+    // synthetic smoothing
+    const base = 125000 + (i-15)*120;
+    const noise = Math.round((Math.sin(i/3)+Math.random()*0.5)*800);
+    return {date, value: Math.round(base + noise)};
+  });
+  const allocation = [
+    {name:'Stocks', value:70000},
+    {name:'Bonds', value:20000},
+    {name:'ETF', value:15000},
+    {name:'Cash', value:5000}
+  ];
+  const positions = [
+    {symbol:'AAPL', name:'Apple', value:8500, pnl:0.12},
+    {symbol:'SBER', name:'Sber', value:9000, pnl:-0.03},
+    {symbol:'MSFT', name:'Microsoft', value:6000, pnl:0.05},
+    {symbol:'VT', name:'Global ETF', value:15000, pnl:0.08}
+  ];
+  const vsIndex = history.map(h=>({date:h.date, portfolio:h.value, index: Math.round(h.value * (0.98 + Math.sin(new Date(h.date).getDate()/5)*0.03))}));
+  const crypto = {
+    coins: [
+      {symbol:'BTC', qty:0.75, price:56000},
+      {symbol:'ETH', qty:10, price:3400},
+      {symbol:'SOL', qty:200, price:120}
+    ]
+  };
+  crypto.coins.forEach(c=>c.value = Math.round(c.qty * c.price));
+  crypto.total = crypto.coins.reduce((s,c)=>s+c.value,0);
+  const tx = [
+    {date: history[history.length-2].date, type:'Buy', asset:'AAPL', amount:2000},
+    {date: history[history.length-4].date, type:'Sell', asset:'BTC', amount:1500},
+    {date: history[history.length-7].date, type:'Deposit', asset:'USD', amount:5000}
+  ];
+  return {history, allocation, positions, vsIndex, crypto, tx};
+})();
+
+/* ---------- HELPERS ---------- */
+function $(sel){return document.querySelector(sel)}
+function el(sel){return document.createElement(sel)}
+
+/* ---------- RENDER ---------- */
+let charts = {};
+
+function renderOverview(){
+  const total = mock.history[mock.history.length-1].value;
+  $('#totalValue').textContent = '$' + total.toLocaleString();
+  // compute simple change %
+  const prev = mock.history[mock.history.length-8].value;
+  const ch = ((total - prev)/prev*100);
+  $('#totalChange').innerHTML = 'Change (7d): <span style="color:'+(ch>=0? '#7cf59b':'#ff8b8b')+'">'+ (ch>=0?'+':'') + ch.toFixed(2) + '%</span>';
+  // top table
+  const tbody = $('#top-table tbody'); tbody.innerHTML='';
+  mock.positions.forEach(p=>{
+    const tr = el('tr');
+    tr.innerHTML = <td>${p.symbol}</td><td>$${p.value.toLocaleString()}</td><td style="color:${p.<!-- Crypto -->
+pnl>0?'#7cf59b':'#ff8b8b'}">${(p.pnl*100).toFixed(1)}%</td>;
+    tbody.appendChild(tr);
+  });
+  // tx table
+  const ttbody = $('#tx-table tbody'); ttbody.innerHTML='';
+  mock.tx.forEach(t=>{
+    const tr = el('tr'); tr.innerHTML = <td>${t.date}</td><td>${t.type}</td><td>${t.asset}</td><td>$${t.amount.toLocaleString()}</td>; ttbody.appendChild(tr);
+  });
+}
+
+function mkLineChart(ctx, labels, datasets, opts){
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: Object.assign({
+      plugins: { legend: {display:false}, tooltip:{mode:'index', intersect:false} },
+      interaction:{mode:'nearest', intersect:false},
+      scales: {
+        x: { display:false },
+        y: { beginAtZero:false, ticks:{color:'#cbd5e1'} }
+      }
+    }, opts||{})
+  });
+}
+
+function mkPieChart(ctx, labels, data, colors){
+  return new Chart(ctx, {
+    type:'pie',
+    data:{labels, datasets:[{data, backgroundColor:colors}]},
+    options:{plugins:{legend:{position:'bottom', labels:{color:'#cbd5e1'}}}}
+  });
+}
+
+function renderCharts(){
+  // portfolio line
+  const labels = mock.history.map(h=>h.date);
+  const vals = mock.history.map(h=>h.value);
+  if(charts.portfolio) charts.portfolio.destroy();
+  charts.portfolio = mkLineChart($('#chart-portfolio'), labels, [{label:'Portfolio', data:vals, borderColor:'#00C2A8', tension:0.3, fill:true, backgroundColor:'rgba(0,194,168,0.06)', pointRadius:0}]);
+
+  // allocation pie
+  const allocLabels = mock.allocation.map(a=>a.name);
+  const allocVals = mock.allocation.map(a=>a.value);
+  const allocColors = ['#0088FE','#00C2A8','#FFBB28','#FF8042'];
+  if(charts.alloc) charts.alloc.destroy();
+  charts.alloc = mkPieChart($('#chart-allocation'), allocLabels, allocVals, allocColors);
+  // legend
+  const legend = $('#alloc-legend'); legend.innerHTML='';
+  mock.allocation.forEach((a,i)=>{ const d = el('div'); d.className='small row'; d.innerHTML = <div style="width:12px;height:12px;background:${allocColors[i]};border-radius:3px"></div><div style="margin-left:8px">${a.name} — $${a.value.toLocaleString()}</div>; legend.appendChild(d); });
+
+  // performance vs index
+  const vsLabels = mock.vsIndex.map(v=>v.date);
+  const pf = mock.vsIndex.map(v=>v.portfolio);
+  const idx = mock.vsIndex.map(v=>v.index);
+  if(charts.vs) charts.vs.destroy();
+  charts.vs = mkLineChart($('#chart-vsindex'), vsLabels, [
+    {label:'Portfolio', data:pf, borderColor:'#00C2A8', tension:0.3, fill:false, pointRadius:0},
+    {label:'Index', data:idx, borderColor:'#8884d8', tension:0.3, fill:false, pointRadius:0}
+  ], { plugins:{ legend:{display:true, labels:{color:'#cbd5e1'}}}, scales:{x:{display:false}}});
+
+  // crypto
+  const coinLabels = mock.crypto.coins.map(c=>c.symbol);
+  const coinVals = mock.crypto.coins.map(c=>c.value);
+  $('#cryptoTotal').textContent = '$' + mock.crypto.total.toLocaleString();
+  if(charts.crypto) charts.crypto.destroy();
+  charts.crypto = mkLineChart($('#chart-crypto'), mock.crypto.coins[0] ? mock.history?.map(h=>h.date)  [] : [], [{label:'Crypto total', data: mock.crypto.coins.length ? mock.history?.map(h=>h.value)  [] : [], borderColor:'#ffb74d', tension:0.3, fill:false, pointRadius:0}], { plugins:{ legend:{display:false}}});
+  if(charts.coinpie) charts.coinpie.destroy();
+  const coinColors = ['#f7931a','#3c3c3d','#00aaff'];
+  charts.coinpie = mkPieChart($('#chart-coinpie'), coinLabels, coinVals, coinColors);
+  const coinLegend = $('#coin-legend'); coinLegend.innerHTML='';
+  mock.crypto.coins.forEach((c,i)=>{ const d = el('div'); d.className='small row'; d.innerHTML = <div style="width:12px;height:12px;background:${coinColors[i]};border-radius:3px"></div><div style="margin-left:8px">${c.symbol} — $${Math.round(c.value).toLocaleString()}</div>; coinLegend.appendChild(d); });
+}
+
+/* ---------- NAVIGATION ---------- */
+function showView(id){
+  document.querySelectorAll('.view').forEach(s=> s.style.display = s.id===id ? '' : 'none');
+  document.querySelectorAll('nav a').forEach(a=> a.classList.remove('active'));
+  document.getElementById('link-' + id).classList.add('active');
+}/* ---------- INIT ---------- */
+document.getElementById('btn-refresh').addEventListener('click', ()=> {
+  // simple "refresh": mutate mock slightly
+  mock.history.forEach(h => { h.value = Math.round(h.value * (0.995 + Math.random()*0.01)); });
+  renderOverview(); renderCharts();
+});
+
+document.getElementById('link-dashboard').addEventListener('click', e=>{ e.preventDefault(); showView('dashboard'); });
+document.getElementById('link-crypto').addEventListener('click', e=>{ e.preventDefault(); showView('crypto'); });
+document.getElementById('link-transactions').addEventListener('click', e=>{ e.preventDefault(); showView('transactions'); });
+document.getElementById('link-settings').addEventListener('click', e=>{ e.preventDefault(); showView('settings'); });
+
+renderOverview();
+renderCharts();
+
+/* ---------- Responsive tip for mobile: auto-scroll to charts on nav click ---------- */
+document.querySelectorAll('nav a').forEach(a => a.addEventListener('click', ()=> setTimeout(()=> window.scrollTo({top:0, behavior:'smooth'}),200)));
+</script>
+</body>
+</html>
